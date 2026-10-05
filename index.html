@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timeflow — Daily tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <div class="daily-todos">
+          <p class="eyebrow">SUNDAY · OCTOBER 4</p>
+          <h1 class="streak-count" id="streak-count" aria-label="Day 4 of a 90 day streak">4/90</h1>
+          <div class="todo-list" aria-label="Daily to-do markers">
+            <div class="todo-row"><span>Food</span><div class="todo-markers"><button aria-label="Food task 1"></button><button aria-label="Food task 2"></button><button aria-label="Food task 3"></button><button aria-label="Food task 4"></button></div></div>
+            <div class="todo-row"><span>Workout</span><div class="todo-markers"><button aria-label="Workout task 1"></button><button aria-label="Workout task 2"></button><button aria-label="Workout task 3"></button></div></div>
+          </div>
+        </div>
+        <section class="dashboard" aria-label="Today’s activity summary">
+          <p class="eyebrow">TODAY'S RHYTHM</p>
+          <table class="stats-table" aria-label="Today's tracked activity">
+            <tbody id="stats-grid"></tbody>
+          </table>
+        </section>
+        <div class="clock-card" aria-label="Live analogue clock">
+          <div class="clock" id="clock"></div>
+          <div class="clock-copy"><strong id="digital-clock">12:00 PM</strong><span>local time</span></div>
+        </div>
+      </section>
+
+      <section class="tracker" aria-label="Daily time tracker">
+        <div class="tracker-top">
+          <button class="nav-button" id="previous" aria-label="Show previous twelve hours">←</button>
+          <div class="date-pill"><span>12-hour view</span><strong id="range-label">6 AM — 5 PM</strong></div>
+          <button class="nav-button" id="next" aria-label="Show next twelve hours">→</button>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+
+    </main>
+
+    <div class="activity-picker" aria-label="Choose activity">
+      <div class="picker-main">
+        <p>Choose a focus, then tap any 15-minute block</p>
+        <div class="activity-options" id="activity-options"></div>
+        <button class="restart-button" id="restart" type="button">↺ Clear today</button>
+      </div>
+      <div class="detail-picker" id="detail-picker" hidden></div>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
