@@ -1,22 +1,12 @@
 const activities = [
-  { id: 'study', icon: '🔥', name: 'Focus', color: 'var(--study)' },
-  { id: 'work', icon: '💼', name: 'Work', color: 'var(--work)' },
-  { id: 'waste', icon: '✕', name: 'Time waste', color: 'var(--waste)' },
-  { id: 'daily', icon: '☻', name: 'Daily activities', color: 'var(--daily)' },
-  { id: 'tinker', icon: '🔧', name: 'Tinkering', color: 'var(--tinker)' },
+  { icon: '🔥', name: 'Productive', color: 'var(--study)' },
+  { icon: '➖', name: 'Non-productive', color: 'var(--work)' },
+  { icon: '✕', name: 'Time waste', color: 'var(--waste)' },
+  { icon: '☻', name: 'Daily activities', color: 'var(--daily)' },
+  { icon: '🔧', name: 'Tinkering', color: 'var(--tinker)' },
 ];
-const dailyDetails = [
-  { id: 'eating', icon: '🍽️', name: 'Eating' },
-  { id: 'bathing', icon: '🛁', name: 'Bathing' },
-  { id: 'kids', icon: '🚗', name: 'Kids pickup' },
-  { id: 'essential', icon: '✓', name: 'Other essential' },
-];
-let selected = 'study';
-let selectedDetail = 'eating';
-let startHour = 18;
+let selected = 'Productive';
 const tracked = new Map();
-const slotDetails = new Map();
-const todoButtons = [...document.querySelectorAll('.todo-markers button')];
 function getDayKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -24,7 +14,7 @@ function getDayKey() {
 let dayKey = getDayKey();
 
 function currentState() {
-  return { slots: Object.fromEntries([...tracked].filter(([, activity]) => activity)), details: Object.fromEntries(slotDetails), todos: todoButtons.map(button => button.classList.contains('done')), selected, selectedDetail };
+  return { slots: Object.fromEntries([...tracked].filter(([, activity]) => activity)), selected };
 }
 function persistState() {
   const state = currentState();
@@ -33,19 +23,21 @@ function persistState() {
 async function restoreState() {
   const state = JSON.parse(localStorage.getItem(`timeflow-${dayKey}`) || 'null');
   if (!state) return;
-  Object.entries(state.slots || {}).forEach(([key, activity]) => tracked.set(key, activity));
-  Object.entries(state.details || {}).forEach(([key, detail]) => slotDetails.set(key, detail));
-  selected = activities.some(activity => activity.id === state.selected) ? state.selected : selected;
-  selectedDetail = dailyDetails.some(detail => detail.id === state.selectedDetail) ? state.selectedDetail : selectedDetail;
-  todoButtons.forEach((button, index) => button.classList.toggle('done', Boolean(state.todos?.[index])));
+  const oldNames = { study: 'Productive', work: 'Non-productive', waste: 'Time waste', daily: 'Daily activities', tinker: 'Tinkering' };
+  Object.entries(state.slots || {}).forEach(([key, activity]) => {
+    const name = oldNames[activity] || activity;
+    if (activities.some(item => item.name === name)) tracked.set(key, name);
+  });
+  selected = oldNames[state.selected] || state.selected;
+  if (!activities.some(activity => activity.name === selected)) selected = 'Productive';
 }
 function scheduleDailyReset() {
   const now = new Date();
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   setTimeout(() => {
     dayKey = getDayKey();
-    tracked.clear(); selected = 'study'; todoButtons.forEach(button => button.classList.remove('done'));
-    renderPicker(); renderTimeline(); renderStats(); flash('New day — tracker cleared');
+    tracked.clear(); selected = 'Productive';
+    renderPicker(); renderTimeline(); renderSummary(); flash('New day — tracker cleared');
     scheduleDailyReset();
   }, midnight - now + 1000);
 }
@@ -71,7 +63,9 @@ function createClock() {
     number.style.top = `${50 + Math.sin(radians) * 40}%`;
     clock.append(number);
   }
-  ['hour-hand','minute-hand','second-hand'].forEach(className => { const hand = document.createElement('i'); hand.className = `hand ${className}`; clock.append(hand); });
+  ['hour-hand', 'minute-hand', 'second-hand'].forEach(className => {
+    const hand = document.createElement('i'); hand.className = `hand ${className}`; clock.append(hand);
+  });
   const center = document.createElement('i'); center.className = 'clock-center'; clock.append(center);
 }
 function updateClock() {
@@ -79,53 +73,51 @@ function updateClock() {
   document.querySelector('.hour-hand').style.transform = `rotate(${hour * 30 + min / 2}deg)`;
   document.querySelector('.minute-hand').style.transform = `rotate(${min * 6 + sec / 10}deg)`;
   document.querySelector('.second-hand').style.transform = `rotate(${sec * 6}deg)`;
-  document.querySelector('#digital-clock').textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 }
-function formatHour(hour) { const ampm = hour >= 12 ? 'PM' : 'AM'; return `${hour % 12 || 12} ${ampm}`; }
-function periodName(hour) {
-  if (hour >= 5 && hour < 9) return 'Early morning';
-  if (hour >= 9 && hour < 12) return 'Morning';
-  if (hour >= 12 && hour < 15) return 'Midday';
-  if (hour >= 15 && hour < 18) return 'Afternoon';
-  if (hour >= 18 && hour < 21) return 'Evening';
-  if (hour >= 21) return 'Night';
-  if (hour < 3) return 'Midnight';
-  return 'Late night';
-}
+function formatHour(hour) { const normalized = hour % 24, ampm = normalized >= 12 ? 'PM' : 'AM'; return `${normalized % 12 || 12} ${ampm}`; }
 function renderTimeline() {
-  document.querySelector('#range-label').textContent = `${formatHour(startHour)} — ${formatHour((startHour + 11) % 24)}`;
   const timeline = document.querySelector('#timeline'); timeline.innerHTML = '';
-  for (let period = 0; period < 4; period++) {
-    const firstHour = (startHour + period * 3) % 24;
+  for (let period = 0; period < 8; period++) {
+    const firstHour = period * 3;
     const panel = document.createElement('article'); panel.className = 'period';
-    panel.innerHTML = `<header class="period-header"><b>${periodName(firstHour)}</b><span>${formatHour(firstHour)}</span></header>`;
+    panel.innerHTML = `<header class="period-header"><b>${formatHour(firstHour)} – ${formatHour(firstHour + 3)}</b></header>`;
     for (let row = 0; row < 3; row++) {
-      const hour = (firstHour + row) % 24, hourRow = document.createElement('div'); hourRow.className = 'hour';
+      const hour = firstHour + row;
+      const hourRow = document.createElement('div'); hourRow.className = 'hour';
       hourRow.innerHTML = `<span class="hour-label">${hour % 12 || 12}</span>`;
       for (let quarter = 0; quarter < 4; quarter++) {
         const key = `${hour}-${quarter}`, slot = document.createElement('button');
-        const activityId = tracked.get(key), activity = activities.find(a => a.id === activityId);
-        slot.className = `slot ${activityId ? `active-${activityId}` : ''}`; slot.title = `${formatHour(hour)}:${String(quarter * 15).padStart(2,'0')}${activity ? ` · ${activity.name}` : ''}`;
+        const activityName = tracked.get(key), activity = activities.find(a => a.name === activityName);
+        slot.className = 'slot'; if (activity) slot.style.background = activity.color;
+        slot.title = `${formatHour(hour)}:${String(quarter * 15).padStart(2,'0')}${activity ? ` · ${activity.name}` : ''}`;
         slot.setAttribute('aria-label', slot.title); if (activity) slot.innerHTML = `<span class="slot-symbol">${activity.icon}</span>`;
         slot.dataset.key = key; slot.addEventListener('click', () => setSlot(slot)); hourRow.append(slot);
-      } panel.append(hourRow);
-    } timeline.append(panel);
+      }
+      panel.append(hourRow);
+    }
+    timeline.append(panel);
   }
 }
-function setSlot(slot) { const current = tracked.get(slot.dataset.key); tracked.set(slot.dataset.key, current === selected ? '' : selected); renderTimeline(); renderStats(); persistState(); flash(current === selected ? 'Block cleared · saved' : `${activities.find(a => a.id === selected).name} added · saved`); }
-function renderPicker() { document.querySelector('#activity-options').innerHTML = activities.map(a => `<button class="activity ${a.id}" data-id="${a.id}" aria-pressed="${a.id === selected}">${a.icon} ${a.name}</button>`).join(''); document.querySelectorAll('.activity').forEach(b => b.onclick = () => { selected = b.dataset.id; renderPicker(); persistState(); }); }
-function renderStats() { const values = Object.fromEntries(activities.map(a => [a.id, 0])); [...tracked.values()].forEach(id => { if (id) values[id]++; });
-  document.querySelector('#stats-grid').innerHTML = activities.map(a => { const n = values[a.id], hours = `${Math.floor(n/4)}h ${String(n%4*15).padStart(2,'0')}m`; return `<tr><td class="stat-icon">${a.icon}</td><th scope="row" class="stat-name">${a.name}</th><td class="stat-time">${hours}</td></tr>`; }).join(''); }
+function renderPicker() {
+  document.querySelector('#activity-options').innerHTML = activities.map(a => `<button class="activity" data-name="${a.name}" style="--activity-color:${a.color}" aria-pressed="${a.name === selected}">${a.icon} ${a.name}</button>`).join('');
+  document.querySelectorAll('.activity').forEach(button => button.onclick = () => { selected = button.dataset.name; renderPicker(); persistState(); });
+}
+function renderSummary() {
+  const totals = Object.fromEntries(activities.map(activity => [activity.name, 0]));
+  tracked.forEach(name => { if (name) totals[name]++; });
+  const formatDuration = slots => `${Math.floor(slots / 4)}h ${String((slots % 4) * 15).padStart(2, '0')}m`;
+  const summaryOrder = ['Productive', 'Non-productive', 'Tinkering', 'Daily activities', 'Time waste'];
+  document.querySelector('#tag-summary').innerHTML = summaryOrder.map(name => `<div class="tag-total"><span class="tag-total-name">${name}:</span><strong>${formatDuration(totals[name])}</strong></div>`).join('');
+}
+function setSlot(slot) { const current = tracked.get(slot.dataset.key); tracked.set(slot.dataset.key, current === selected ? '' : selected); renderTimeline(); renderPicker(); renderSummary(); persistState(); flash(current === selected ? 'Block cleared · saved' : `${selected} added · saved`); }
 let toastTimer; function flash(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 1500); }
-document.querySelector('#previous').onclick = () => { startHour = (startHour + 12) % 24; renderTimeline(); };
-document.querySelector('#next').onclick = () => { startHour = (startHour + 12) % 24; renderTimeline(); };
 async function initialise() {
   await restoreState();
-  createClock(); updateClock(); updateStreak(); setInterval(updateClock, 1000); renderPicker(); renderTimeline(); renderStats(); scheduleDailyReset();
-  todoButtons.forEach(marker => marker.addEventListener('click', () => { marker.classList.toggle('done'); persistState(); }));
+  createClock(); updateClock(); setInterval(updateClock, 1000);
+  updateStreak(); renderPicker(); renderTimeline(); renderSummary(); scheduleDailyReset();
   document.querySelector('#restart').addEventListener('click', () => {
-    tracked.clear(); selected = 'study'; todoButtons.forEach(marker => marker.classList.remove('done'));
-    persistState(); renderPicker(); renderTimeline(); renderStats(); flash('Today restarted');
+    tracked.clear(); selected = 'Productive';
+    persistState(); renderPicker(); renderTimeline(); renderSummary(); flash('Today restarted');
   });
 }
 initialise();
